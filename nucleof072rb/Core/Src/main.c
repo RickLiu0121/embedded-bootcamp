@@ -65,39 +65,32 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint16_t read_adc_value(void){
-	uint8_t tx_data[3] = {0};
-	uint8_t rx_data[3] = {0};
-	uint16_t adc_result = 0;
+uint16_t read_adc_value(uint8_t tx_data[], uint8_t rx_data[]){
 
-	tx_data[0] = 0x01;  //00000001
-	tx_data[1] = 0x01 << 4; //10000000
-	tx_data[2] = 0x00; //don'tcare
-
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
 
 	    // Transmit and receive data simultaneously
-	HAL_SPI_TransmitReceive(&hspi1, tx_data, rx_data, 3, HAL_MAX_DELAY);
-
+	HAL_StatusTypeDef status = HAL_SPI_TransmitReceive(&hspi1, tx_data, rx_data, sizeof(tx_data), HAL_MAX_DELAY);
+	if (status != HAL_OK) {
+		return -1;
+	}
 	    // Pull CS high to end communication
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
 
 	    // Extract 10-bit result from received data
 	    // MCP3004 sends data in bits [9:0] across bytes 1 and 2
-	adc_result = ((rx_data[1] & 0x03) << 8) | rx_data[2];
 
-	return adc_result;
+	return ((rx_data[1] & 0x03) << 8) | rx_data[2];
 
 }
 uint16_t adc_to_pwm(uint16_t adc_value){
-	uint16_t pulse_width;
-	uint16_t timer_counts;
+	uint32_t pulse_width;
 
-	pulse_width = SERVO_MIN_PULSE + ((adc_value * (SERVO_MAX_PULSE - SERVO_MIN_PULSE) / ADC_MAX_VALUE));
 
-	timer_counts = pulse_width * 65535/20;
+	pulse_width = SERVO_MIN_PULSE + (adc_value * (SERVO_MAX_PULSE - SERVO_MIN_PULSE)) / ADC_MAX_VALUE;
 
-	return timer_counts;
+	//convert to the timer "on" counts for PWM signal
+	return pulse_width * 65525/20;
 
 }
 void set_servo_position(uint16_t pwd_counts){
@@ -114,6 +107,13 @@ int main(void)
   /* USER CODE BEGIN 1 */
   uint16_t adc_value = 0;
   uint16_t pwm_counts = 0;
+  uint8_t tx_data[3] = {0};
+  uint8_t rx_data[3] = {0};
+  uint16_t adc_result = 0;
+
+  tx_data[0] = 0x01;  //00000001
+  tx_data[1] = 0x01 << 8; //10000000
+  tx_data[2] = 0x00; //don'tcare
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -141,7 +141,7 @@ int main(void)
   MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
 
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+//  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
   HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_1);
 
 
@@ -152,7 +152,7 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	  adc_value = read_adc_value();
+	  adc_value = read_adc_value(tx_data, rx_data);
 	  pwm_counts = adc_to_pwm(adc_value);
 	  set_servo_position(pwm_counts);
 	  HAL_Delay(10);
