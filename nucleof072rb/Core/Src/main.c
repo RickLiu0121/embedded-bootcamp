@@ -74,11 +74,10 @@ uint16_t read_adc_value(uint8_t tx_data[], uint8_t rx_data[]){
 	if (status != HAL_OK) {
 		return -1;
 	}
-	    // Pull CS high to end communication
+	// Pull CS high to end communication
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
 
-	    // Extract 10-bit result from received data
-	    // MCP3004 sends data in bits [9:0] across bytes 1 and 2
+	// Extract 10-bit result from received data
 
 	return ((rx_data[1] & 0x03) << 8) | rx_data[2];
 
@@ -109,7 +108,6 @@ int main(void)
   uint16_t pwm_counts = 0;
   uint8_t tx_data[3] = {0};
   uint8_t rx_data[3] = {0};
-  uint16_t adc_result = 0;
 
   tx_data[0] = 0x01;  //00000001
   tx_data[1] = 0x01 << 8; //10000000
