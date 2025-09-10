@@ -6,7 +6,7 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
+  * <h2><center>&copy; Copyright (c) 2025 STMicroelectronics.
   * All rights reserved.</center></h2>
   *
   * This software component is licensed by ST under BSD 3-Clause license,
@@ -19,11 +19,19 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#define ADC_MAX_VALUE 1023
+#define PWM_PERIOD  20
+#define TIMER_FREQUENCY  1000000
+#define SERVO_MIN_PULSE  1000   //1ms in microseconds
+#define SERVO_MAX_PULSE  2000
+
 
 /* USER CODE END Includes */
 
@@ -34,6 +42,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -44,7 +55,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+//SPI_HandleTypeDef hspi1;
+//TIM_HandleTypeDef htim1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -55,7 +67,44 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+uint16_t read_adc_value(void){
+	uint8_t tx_data[3] = {0};
+	uint8_t rx_data[3] = {0};
+	uint16_t adc_result = 0;
 
+	tx_data[0] = 0x01;  //00000001
+	tx_data[1] = 0x01 << 4; //10000000
+	tx_data[2] = 0x00; //don'tcare
+
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+
+	    // Transmit and receive data simultaneously
+	HAL_SPI_TransmitReceive(&hspi1, tx_data, rx_data, 3, HAL_MAX_DELAY);
+
+	    // Pull CS high to end communication
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+
+	    // Extract 10-bit result from received data
+	    // MCP3004 sends data in bits [9:0] across bytes 1 and 2
+	adc_result = ((rx_data[1] & 0x03) << 8) | rx_data[2];
+
+	return adc_result;
+
+}
+uint16_t adc_to_pwm(uint16_t adc_value){
+	uint16_t pulse_width;
+	uint16_t timer_counts;
+
+	pulse_width = SERVO_MIN_PULSE + ((adc_value * (SERVO_MAX_PULSE - SERVO_MIN_PULSE) / ADC_MAX_VALUE));
+
+	timer_counts = pulse_width * 65535/20;
+
+	return timer_counts;
+
+}
+void set_servo_position(uint16_t pwd_counts){
+	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, pwd_counts);
+}
 /* USER CODE END 0 */
 
 /**
@@ -65,7 +114,8 @@ void SystemClock_Config(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+  uint16_t adc_value = 0;
+  uint16_t pwm_counts = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -74,6 +124,8 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+
+
 
   /* USER CODE END Init */
 
@@ -87,7 +139,13 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_SPI1_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
+
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);
+  HAL_TIM_PWM_Start(&htim1,TIM_CHANNEL_1);
+
 
   /* USER CODE END 2 */
 
@@ -96,9 +154,13 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
+	  adc_value = read_adc_value();
+	  pwm_counts = adc_to_pwm(adc_value);
+	  set_servo_position(pwm_counts);
+	  HAL_Delay(10);
+	  /* USER CODE BEGIN 3 */
   }
+  HAL_Delay(10);
   /* USER CODE END 3 */
 }
 
