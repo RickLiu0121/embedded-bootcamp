@@ -27,8 +27,6 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #define ADC_MAX_VALUE 1023
-#define PWM_PERIOD  20
-#define TIMER_FREQUENCY  1000000
 #define SERVO_MIN_PULSE  1000   //1ms in microseconds
 #define SERVO_MAX_PULSE  2000
 
