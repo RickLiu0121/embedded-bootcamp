@@ -26,8 +26,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#define SERVO_MIN_PULSE  1000   //1ms in microseconds
-#define SERVO_MAX_PULSE  2000
+#define ADC_MAX_VALUE 1023.0
+
 
 
 /* USER CODE END Includes */
@@ -81,17 +81,16 @@ uint16_t read_adc_value(uint8_t tx_data[], uint8_t rx_data[], int length){
 
 	// Extract 10-bit result from received data
 
-	return ((rx_data[1] & 0x03) << 7) | rx_data[2];
+	return ((rx_data[1] & 0x03) << 8) | rx_data[2];
 
 }
 uint16_t adc_to_pwm(uint16_t adc_value){
-	uint32_t pulse_width;
+	uint32_t pwm_min = __HAL_TIM_GET_AUTORELOAD(&htim1) * 0.05;
+	uint32_t pwm_max = __HAL_TIM_GET_AUTORELOAD(&htim1) * 0.1;
+	uint32_t pwm_value = pwm_min + ((pwm_max - pwm_min) * adc_value) / ADC_MAX_VALUE;
 
-
-	pulse_width = SERVO_MIN_PULSE + (adc_value * (SERVO_MAX_PULSE - SERVO_MIN_PULSE)) / 1023.0;
-
-	//convert to the timer "on" counts for PWM signal
-	return pulse_width;
+	// the timer "on" counts for PWM signal
+	return pwm_value;
 
 }
 void set_servo_position(uint16_t pwd_counts){
