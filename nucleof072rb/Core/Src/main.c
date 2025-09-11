@@ -26,7 +26,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#define ADC_MAX_VALUE 1023
 #define SERVO_MIN_PULSE  1000   //1ms in microseconds
 #define SERVO_MAX_PULSE  2000
 
@@ -65,31 +64,34 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint16_t read_adc_value(uint8_t tx_data[], uint8_t rx_data[]){
+
+
+uint16_t read_adc_value(uint8_t tx_data[], uint8_t rx_data[], int length){
 
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_RESET);
 
 	    // Transmit and receive data simultaneously
-	HAL_StatusTypeDef status = HAL_SPI_TransmitReceive(&hspi1, tx_data, rx_data, sizeof(tx_data), HAL_MAX_DELAY);
+	HAL_StatusTypeDef status = HAL_SPI_TransmitReceive(&hspi1, tx_data, rx_data, length, HAL_MAX_DELAY);
 	if (status != HAL_OK) {
-		return -1;
+		printf("Error: %d", status);
+		Error_Handler();
 	}
 	// Pull CS high to end communication
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, GPIO_PIN_SET);
 
 	// Extract 10-bit result from received data
 
-	return ((rx_data[1] & 0x03) << 8) | rx_data[2];
+	return ((rx_data[1] & 0x03) << 7) | rx_data[2];
 
 }
 uint16_t adc_to_pwm(uint16_t adc_value){
 	uint32_t pulse_width;
 
 
-	pulse_width = SERVO_MIN_PULSE + (adc_value * (SERVO_MAX_PULSE - SERVO_MIN_PULSE)) / ADC_MAX_VALUE;
+	pulse_width = SERVO_MIN_PULSE + (adc_value * (SERVO_MAX_PULSE - SERVO_MIN_PULSE)) / 1023.0;
 
 	//convert to the timer "on" counts for PWM signal
-	return pulse_width * 65525/20;
+	return pulse_width;
 
 }
 void set_servo_position(uint16_t pwd_counts){
@@ -108,9 +110,10 @@ int main(void)
   uint16_t pwm_counts = 0;
   uint8_t tx_data[3] = {0};
   uint8_t rx_data[3] = {0};
+  const int LENGTH = 3;
 
   tx_data[0] = 0x01;  //00000001
-  tx_data[1] = 0x01 << 8; //10000000
+  tx_data[1] = 0x01 << 7; //10000000
   tx_data[2] = 0x00; //don'tcare
   /* USER CODE END 1 */
 
@@ -150,13 +153,12 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-	  adc_value = read_adc_value(tx_data, rx_data);
+	  adc_value = read_adc_value(tx_data, rx_data, LENGTH);
 	  pwm_counts = adc_to_pwm(adc_value);
 	  set_servo_position(pwm_counts);
 	  HAL_Delay(10);
 	  /* USER CODE BEGIN 3 */
   }
-  HAL_Delay(10);
   /* USER CODE END 3 */
 }
 
